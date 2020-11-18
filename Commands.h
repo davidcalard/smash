@@ -2,22 +2,28 @@
 #define SMASH_COMMAND_H_
 
 #include <utility>
-#include <vector>
+#include <map>
 
 #define COMMAND_ARGS_MAX_LENGTH (200)
 #define COMMAND_MAX_ARGS (20)
 #define HISTORY_MAX_RECORDS (50)
 
+
 class Command {
 // TODO: Add your data members
   char* cmd_args[COMMAND_MAX_ARGS];
   int cmd_num_args;
+  char cmd[50];
+  int pid;
  public:
   Command(const char* cmd_line);
-  virtual ~Command();
+  virtual ~Command() {}
   virtual void execute() = 0;
   char** getArguments();
   int getNumArguments();
+  char* getCmd();
+  int getMyPid();
+  void setPid(int n);
   //virtual void prepare();
   //virtual void cleanup();
   // TODO: Add your extra methods if needed
@@ -25,11 +31,12 @@ class Command {
 
 class BuiltInCommand : public Command {
  public:
-  BuiltInCommand(const char* cmd_line);
+  BuiltInCommand(const char* cmd_line) : Command(cmd_line) {}
   virtual ~BuiltInCommand() {}
 };
 
 class ExternalCommand : public Command {
+
  public:
   ExternalCommand(const char* cmd_line);
   virtual ~ExternalCommand() {}
@@ -57,8 +64,15 @@ class RedirectionCommand : public Command {
 class ChangePromptCommand : public BuiltInCommand {
 // TODO: Add your data members public:
 public:
-    ChangePromptCommand(const char *cmd_line);
+    ChangePromptCommand(const char *cmd_line): BuiltInCommand(cmd_line) {}
     virtual ~ChangePromptCommand() {}
+    void execute() override;
+};
+
+class LetSeeCommand : public BuiltInCommand {
+public:
+    LetSeeCommand(const char* cmd_line): BuiltInCommand(cmd_line) {}
+    virtual ~LetSeeCommand() {}
     void execute() override;
 };
 
@@ -123,12 +137,19 @@ class HistoryCommand : public BuiltInCommand {
 class JobsList {
  public:
   class JobEntry {
-   // TODO: Add your data members
+   public:
+      Command* cmd;
+      bool is_stopped;
+      time_t start_time;
+
+      JobEntry(Command* cmd, bool is_stopped);
   };
- // TODO: Add your data members
- public:
+
+  int max_job_id;
+  std::map<int,JobEntry> job_list;
+
   JobsList();
-  ~JobsList();
+  ~JobsList() = default;
   void addJob(Command* cmd, bool isStopped = false);
   void printJobsList();
   void killAllJobs();
@@ -199,7 +220,7 @@ public:
     void executeCommand(const char *cmd_line);
 
     // TODO: add extra methods as needed
-    std::string getPrompt() { return prompt; }
+    void printPrompt() { std::cout << prompt; }
 
     void changePrompt(std::string s) { prompt = s; }
 };
