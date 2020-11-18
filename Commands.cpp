@@ -5,6 +5,9 @@
 #include <sstream>
 #include <sys/wait.h>
 #include <iomanip>
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/dir.h>
 #include "Commands.h"
 
 using namespace std;
@@ -84,11 +87,9 @@ void _removeBackgroundSign(char* cmd_line) {
   cmd_line[str.find_last_not_of(WHITESPACE, idx) + 1] = 0;
 }
 
-// TODO: Add your implementation for classes in Commands.h 
+// TODO: Add your implementation for classes in Commands.h
 
-SmallShell::SmallShell() {
-// TODO: add your implementation
-}
+SmallShell::SmallShell(): prompt("smash> "){}
 
 SmallShell::~SmallShell() {
 // TODO: add your implementation
@@ -114,10 +115,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   if (cmd_s.find("chprompt") == 0) {
     return new ChangePromptCommand(cmd_line);
   }
-  /*else if (cmd_s.find("ls") == 0) {
-  	return new GetCurrDirCommand(cmd_line);
+  else if (cmd_s.find("ls") == 0) {
+  	return new LetSeeCommand(cmd_line);
   }
-  else if (cmd_s.find("showpid") == 0) {
+  /*else if (cmd_s.find("showpid") == 0) {
   	return new ShowPidCommand(cmd_line);
   }
   else if (cmd_s.find("pwd") == 0) {
@@ -165,8 +166,9 @@ void SmallShell::executeCommand(const char *cmd_line) {
 
 //-----------------------Command------------------------//
 
-Command::Command(const char* cmd_line) {
+Command::Command(const char* cmd_line): pid(0) {
     cmd_num_args = _parseCommandLine(cmd_line,cmd_args);
+    strcpy(cmd, cmd_line);
 }
 
 char **Command::getArguments() {
@@ -175,6 +177,18 @@ char **Command::getArguments() {
 
 int Command::getNumArguments() {
     return cmd_num_args;
+}
+
+char *Command::getCmd() {
+    return cmd;
+}
+
+int Command::getMyPid() {
+    return pid;
+}
+
+void Command::setPid(int n) {
+    pid = n;
 }
 
 //------------------------------------------------------//
@@ -193,9 +207,59 @@ void CommandsHistory::printHistory() {
     cout << this->last_dir.dir << endl;
 }
 
-void ::execute() {
+void ChangePromptCommand::execute() {
     string newPrompt;
-    ifChangePromptCommand(getNumArguments()==1) newPrompt = "smash> ";
-    if(getNumArguments()==2) newPrompt = getArguments()[1];
+    if (getNumArguments() == 1) newPrompt = "smash> ";
+    if (getNumArguments() == 2) newPrompt = getArguments()[1];
     smash.changePrompt(newPrompt);
 }
+
+void LetSeeCommand::execute() {
+    struct dirent **namelist;
+    int i,n;
+
+
+    n = scandir(".", &namelist, NULL, alphasort);
+    if (n < 0)
+        perror("scandir");
+    else {
+        for (i = 2; i < n; i++) {
+            printf("%s\n", namelist[i]->d_name);
+        }
+    }
+}
+
+
+
+//-----------------------JobsList------------------------//
+
+JobsList::JobEntry::JobEntry(Command* cmd, bool is_stopped):
+    cmd(cmd), is_stopped(is_stopped) {
+    time(&start_time);
+}
+
+JobsList::JobsList(): max_job_id(0), job_list(std::map<int,JobEntry>()) {}
+
+void JobsList::addJob(Command* cmd, bool isStopped){
+    max_job_id++;
+    job_list.emplace(max_job_id, JobEntry(cmd,isStopped));
+}
+
+void JobsList::printJobsList() {
+    for (auto iterator = job_list.begin(); iterator != job_list.end(); ++iterator){
+        time_t* curr_time;
+        time(curr_time);
+        cout << "[" << iterator.operator*().first << "]" <<
+        iterator.operator*().second.cmd->getCmd() << ":" << iterator.operator*().second.cmd->getMyPid() <<
+        difftime(*curr_time,iterator.operator*().second.start_time);
+        if(iterator.operator*().second.is_stopped) cout << "(stopped)";
+        cout << endl;
+    }
+}
+
+
+
+
+
+
+
