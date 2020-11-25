@@ -43,7 +43,7 @@ int _parseCommandLine(const char* cmd_line, char** args) {
   FUNC_ENTRY()
   int i = 0;
   std::istringstream iss(_trim(string(cmd_line)).c_str());
-  for(std::string s; iss >> s; ) {
+  for(std::string s; iss.str().find("|") != std::string::npos || iss >> s; ) {
     args[i] = (char*)malloc(s.length()+1);
     memset(args[i], 0, s.length()+1);
     strcpy(args[i], s.c_str());
@@ -104,7 +104,19 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
   }
 */
     string cmd_s = string(cmd_line);
-    if (cmd_s.find("chprompt") == 0) {
+    int pipe_index = cmd_s.find("|");
+    if (pipe_index != string::npos){
+        if (cmd_s.find("|&")){
+            return new PipeCommand(cmd_line, pipe_index, ERR_PIPE);
+        }
+        else{
+            return new PipeCommand(cmd_line, pipe_index, PIPE);
+        }
+    }
+    else if (cmd_s.find("timeout") == 0) {
+        return new TimeOutCommand(cmd_line);
+    }
+    else if (cmd_s.find("chprompt") == 0) {
         return new ChangePromptCommand(cmd_line);
     }
     else if (cmd_s.find("ls") == 0) {
@@ -140,9 +152,10 @@ Command * SmallShell::CreateCommand(const char* cmd_line) {
     return nullptr;
 }
 
-void SmallShell::executeCommand(const char *cmd_line) {
+void SmallShell::executeCommand(const char *cmd_line, int alarm_time) {
     Command* cmd = CreateCommand(cmd_line);
     smash.getJobsList().removeFinishedJobs();
+    if (alarm_time != NOT_ALARM) cmd->setAlarmTime(alarm_time);
     cmd->execute();
 
   // for example:
@@ -156,7 +169,7 @@ void SmallShell::executeCommand(const char *cmd_line) {
 //-------------------------------------Command-------------------------------------//
 //---------------------------------------------------------------------------------//
 
-Command::Command(const char* cmd_line): pid(0) {
+Command::Command(const char* cmd_line): pid(0), alarm_time(NOT_ALARM) {
     cmd_num_args = _parseCommandLine(cmd_line,cmd_args);
     strcpy(cmd, cmd_line);
 }
@@ -360,7 +373,12 @@ void ExternalCommand::execute() {
             return;
         }
         smash.setCurrCmd(this);
-        waitpid(pid, NULL, WSTOPPED);
+        smash.getJobsList().addJob(this); //TODO: check bg and fg
+        if (waitpid(pid, NULL, WSTOPPED) < 0){
+            perror("smash error: waitpid failed");
+            return;
+        }
+        smash.getJobsList().removeLastAddedJob(); //TODO: check bg and fg
         smash.unsetCurrCmd();
     }
     else{
@@ -389,11 +407,11 @@ void JobsList::addJob(Command* cmd, bool isStopped){
 void JobsList::printJobsList() {
     smash.getJobsList().removeFinishedJobs();
     for (auto iterator = job_list.begin(); iterator != job_list.end(); ++iterator){
-        time_t* curr_time;
-        time(curr_time);
+        time_t curr_time;
+        time(&curr_time);
         cout << "[" << iterator.operator*().first << "]" <<
         iterator.operator*().second.cmd->getCmd() << ":" << iterator.operator*().second.cmd->getMyPid() << " " <<
-        difftime(*curr_time,iterator.operator*().second.start_time) << " secs";
+        difftime(curr_time,iterator.operator*().second.start_time) << " secs";
         if(iterator.operator*().second.is_stopped) cout << " (stopped)";
         cout << endl;
     }
@@ -435,4 +453,29 @@ void JobsList::killAllJobs() {
             return;
         }
     }
+}
+
+void JobsList::removeLastAddedJob() {
+    job_list.erase(max_job_id);
+}
+
+//---------------------------------------------------------------------------------//
+//---------------------------------Special-Command---------------------------------//
+//---------------------------------------------------------------------------------//
+
+
+PipeCommand::PipeCommand(const char *cmd_line, const int index, Mode mode) : Command(cmd_line), mode(mode) {
+    cmd_num_args2 = _parseCommandLine(cmd_line+sizeof(char)*(index+1+mode), cmd_args2);
+    strcpy(cmd2, sizeof(char)*index+getCmd());
+}
+
+void PipeCommand::execute() {
+
+}
+
+void TimeOutCommand::execute() {
+    alarm(atoi(getArguments()[1])); //Always success
+    string s_cmd(getCmd());
+    smash.executeCommand(s_cmd.substr(s_cmd.find(getArguments()[2])).c_str(), atoi(getArguments()[1]));
+
 }
