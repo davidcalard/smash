@@ -8,21 +8,26 @@
 SmallShell& smash = SmallShell::getInstance();
 
 int main(int argc, char* argv[]) {
-   /* if(signal(SIGTSTP , ctrlZHandler)==SIG_ERR) {
+
+    if(signal(SIGTSTP , ctrlZHandler)==SIG_ERR) {
         perror("smash error: failed to set ctrl-Z handler");
     }
     if(signal(SIGINT , ctrlCHandler)==SIG_ERR) {
         perror("smash error: failed to set ctrl-C handler");
     }
-*/
-    //TODO: setup sig alarm handler
-
-    while(true) {
-        //std::cout << smash.getPrompt(); // TODO: change this (why?)
-        smash.printPrompt();
-        std::string cmd_line;
-        std::getline(std::cin, cmd_line);
-        smash.executeCommand(cmd_line.c_str());
+    struct sigaction alarm_act;
+    //memset(alarm_act, '\0', sizeof(alarm_act));
+    alarm_act.sa_flags = SA_RESTART;
+    alarm_act.sa_handler = alarmHandler;
+    if (sigaction(SIGALRM, &alarm_act, NULL) < 0){
+        perror("smash error: failed to set alarm handler");
     }
-    return 0;
+
+   while(true) {
+       smash.printPrompt();
+       std::string cmd_line;
+       std::getline(std::cin, cmd_line);
+       smash.executeCommand(cmd_line.c_str(), NOT_ALARM);
+   }
+   return 0;
 }
