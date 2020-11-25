@@ -17,12 +17,18 @@
 #define COMMAND_LINE_MAX_LENGTH (80)
 #define COMMAND_MAX_ARGS (20)
 #define COMMAND_MAX_LENTH (50)
+#define PIPE 0
+#define ERR_PIPE 1
+#define NOT_ALARM -1
+
+typedef bool Mode;
 
 class Command {
     char* cmd_args[COMMAND_MAX_ARGS];
     int cmd_num_args;
     char cmd[COMMAND_LINE_MAX_LENGTH];
     int pid;
+    int alarm_time;
 public:
     Command(const char* cmd_line);
     virtual ~Command() {}
@@ -32,6 +38,8 @@ public:
     char* getCmd() { return cmd; }
     int& getMyPid() { return pid; }
     void setPid(int n) { pid = n; }
+    int getAlarmTime() { return alarm_time; }
+    void setAlarmTime(int m) { alarm_time = m; }
     //virtual void prepare();
     // virtual void cleanup();
 };
@@ -50,9 +58,13 @@ public:
 };
 
 class PipeCommand : public Command {
-    // TODO: Add your data members
+    char* cmd_args2[COMMAND_MAX_ARGS];
+    int cmd_num_args2;
+    char cmd2[COMMAND_LINE_MAX_LENGTH];
+    int pid2;
+    Mode mode;
 public:
-    PipeCommand(const char* cmd_line);
+    PipeCommand(const char* cmd_line, const int index, Mode mode);
     virtual ~PipeCommand() {}
     void execute() override;
 };
@@ -131,6 +143,7 @@ public:
     void removeFinishedJobs();
     JobEntry * getJobById(int jobId);
     void removeJobById(int jobId);
+    void removeLastAddedJob();
     //JobEntry * getLastJob(int* lastJobId);
     //JobEntry *getLastStoppedJob(int *jobId);
 };
@@ -164,8 +177,12 @@ public:
     void execute() override;
 };
 
-// TODO: add more classes if needed 
-// maybe ls, timeout ?
+class TimeOutCommand : public Command {
+public:
+    TimeOutCommand(const char* cmd_line): Command(cmd_line) {}
+    virtual ~TimeOutCommand() {}
+    void execute() override;
+};
 
 class SmallShell {
 private:
@@ -187,7 +204,7 @@ public:
         return instance;
     }
     ~SmallShell();
-    void executeCommand(const char *cmd_line);
+    void executeCommand(const char *cmd_line, int alarm_time);
     void printPrompt() { std::cout << prompt; }
     char* lastDir() { return last_dir; }
     bool isLastDirSet() { return last_dir_init; }
