@@ -30,6 +30,7 @@ void ctrlCHandler(int sig_num) {
             return;
         }
         cout << "smash: process " << smash.getCurrCmd()->getMyPid() << " was killed" << endl;
+        smash.getJobsList().removeFinishedJobs();
     }
     /*else{
         smash.printPrompt();
