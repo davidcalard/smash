@@ -29,6 +29,9 @@
 #define OVERRIDE 0
 #define APPEND 1
 #define UNDEFINED -1
+#define PIPE 0
+#define FIRST 1
+#define SECOND 2
 
 typedef bool Mode;
 
@@ -40,6 +43,8 @@ class Command {
     time_t alarm_time;
     time_t init_time;
     int cmd_job_id;
+    bool is_pipe;
+    int pid2;
 public:
     Command(const char* cmd_line);
     virtual ~Command() {}
@@ -54,6 +59,11 @@ public:
     void setAlarmTime(time_t m) { alarm_time = m; }
     int getCmdJobID() { return cmd_job_id; }
     void setCmdJobId(int job_id) { cmd_job_id = job_id; }
+    bool isPipe() { return is_pipe; }
+    void setIsPipe(bool status) { is_pipe = status; }
+    int& getMyPid2() { return pid2; }
+    void setPid2(int pid2) { pid2 = pid2; }
+    bool is_external;
     //virtual void prepare();
     // virtual void cleanup();
 };
@@ -66,7 +76,7 @@ public:
 
 class ExternalCommand : public Command {
 public:
-    ExternalCommand(const char* cmd_line) : Command(cmd_line) {}
+    ExternalCommand(const char* cmd_line) : Command(cmd_line) { is_external = true; }
     virtual ~ExternalCommand() {}
     void execute() override;
 };
@@ -78,6 +88,7 @@ class PipeCommand : public Command {
     Mode mode;
     char cmd1[COMMAND_LINE_MAX_LENGTH];
 public:
+    bool is_done[2];
     PipeCommand(const char* cmd_line, const int index, Mode mode);
     virtual ~PipeCommand() {}
     void execute() override;
