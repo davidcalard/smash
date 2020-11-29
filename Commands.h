@@ -13,6 +13,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <sys/dir.h>
+#include <list>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 #define COMMAND_LINE_MAX_LENGTH (80)
 #define COMMAND_MAX_ARGS (20)
@@ -20,6 +24,11 @@
 #define PIPE 0
 #define ERR_PIPE 1
 #define NOT_ALARM -1
+#define READ 0
+#define WRITE 1
+#define OVERRIDE 0
+#define APPEND 1
+#define UNDEFINED -1
 
 typedef bool Mode;
 
@@ -28,7 +37,9 @@ class Command {
     int cmd_num_args;
     char cmd[COMMAND_LINE_MAX_LENGTH];
     int pid;
-    int alarm_time;
+    time_t alarm_time;
+    time_t init_time;
+    int cmd_job_id;
 public:
     Command(const char* cmd_line);
     virtual ~Command() {}
@@ -38,8 +49,11 @@ public:
     char* getCmd() { return cmd; }
     int& getMyPid() { return pid; }
     void setPid(int n) { pid = n; }
-    int getAlarmTime() { return alarm_time; }
-    void setAlarmTime(int m) { alarm_time = m; }
+    time_t getAlarmTime() { return alarm_time; }
+    time_t getInitTime() { return init_time; }
+    void setAlarmTime(time_t m) { alarm_time = m; }
+    int getCmdJobID() { return cmd_job_id; }
+    void setCmdJobId(int job_id) { cmd_job_id = job_id; }
     //virtual void prepare();
     // virtual void cleanup();
 };
@@ -59,10 +73,10 @@ public:
 
 class PipeCommand : public Command {
     char* cmd_args2[COMMAND_MAX_ARGS];
-    int cmd_num_args2;
+    char* cmd_args1[COMMAND_MAX_ARGS];
     char cmd2[COMMAND_LINE_MAX_LENGTH];
-    int pid2;
     Mode mode;
+    char cmd1[COMMAND_LINE_MAX_LENGTH];
 public:
     PipeCommand(const char* cmd_line, const int index, Mode mode);
     virtual ~PipeCommand() {}
@@ -70,11 +84,14 @@ public:
 };
 
 class RedirectionCommand : public Command {
-    // TODO: Add your data members
+    Mode mode;
+    const int index;
+    char* command;
 public:
-    explicit RedirectionCommand(const char* cmd_line);
-    virtual ~RedirectionCommand() {}
+    RedirectionCommand(const char* cmd_line, const int index, Mode mode);
+    ~RedirectionCommand() override;
     void execute() override;
+    Mode getMode() { return mode; }
     //void prepare() override;
     // void cleanup() override;
 };
@@ -133,7 +150,6 @@ public:
         JobEntry(Command* cmd, bool is_stopped);
         void resume() { is_stopped = false; }
     };
-    int max_job_id;
     std::map<int,JobEntry> job_list;
     JobsList();
     ~JobsList() = default;
@@ -143,7 +159,7 @@ public:
     void removeFinishedJobs();
     JobEntry * getJobById(int jobId);
     void removeJobById(int jobId);
-    void removeLastAddedJob();
+    int getMaxAvailableID();
     //JobEntry * getLastJob(int* lastJobId);
     //JobEntry *getLastStoppedJob(int *jobId);
 };
@@ -191,10 +207,11 @@ private:
     bool last_dir_init;
     JobsList jobs_list;
     Command* curr_cmd;
+    int smash_pid;
     SmallShell();
 
 public:
-    Command *CreateCommand(const char *cmd_line);
+    Command *CreateCommand(const std::string cmd_line);
     SmallShell(SmallShell const &) = delete; // disable copy ctor
     void operator=(SmallShell const &) = delete; // disable = operator
     static SmallShell &getInstance() // make SmallShell singleton
@@ -204,15 +221,18 @@ public:
         return instance;
     }
     ~SmallShell();
-    void executeCommand(const char *cmd_line, int alarm_time);
+    std::list<Command*> alarm_jobs;
+    void executeCommand(const std::string cmd_line, time_t alarm_time);
     void printPrompt() { std::cout << prompt; }
     char* lastDir() { return last_dir; }
     bool isLastDirSet() { return last_dir_init; }
     void lastDirIsSet() { last_dir_init = true; }
-    void changePrompt(std::string s) { prompt = s; }
+    void changePrompt(std::string s) { prompt = s + "> "; }
     void setCurrCmd(Command* cmd) { curr_cmd = cmd; }
     void unsetCurrCmd() { curr_cmd = nullptr; }
     Command* getCurrCmd() { return curr_cmd; }
     JobsList& getJobsList() { return jobs_list; }
+    bool isOriginalShell() { return smash_pid == getpid(); }
+    int getSmashPid() { return smash_pid; }
 };
 #endif //SMASH_COMMAND_H_
