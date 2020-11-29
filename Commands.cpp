@@ -162,8 +162,7 @@ Command * SmallShell::CreateCommand(const std::string cmd_s) {
 }
 
 void SmallShell::executeCommand(const std::string cmd_line, time_t alarm_time) {
-    string command = _trim(cmd_line);
-    Command* cmd = CreateCommand(command);
+    Command* cmd = CreateCommand(cmd_line);
     smash.getJobsList().removeFinishedJobs();
     if (alarm_time != NOT_ALARM){
         cmd->setAlarmTime(alarm_time);
@@ -182,9 +181,9 @@ void SmallShell::executeCommand(const std::string cmd_line, time_t alarm_time) {
 //-------------------------------------Command-------------------------------------//
 //---------------------------------------------------------------------------------//
 
-Command::Command(const char* cmd_line): pid(0), alarm_time(NOT_ALARM), cmd_job_id(UNDEFINED){
-    cmd_num_args = _parseCommandLine(cmd_line,cmd_args);
+Command::Command(const char* cmd_line): pid(0), alarm_time(NOT_ALARM), cmd_job_id(UNDEFINED), is_pipe(false), pid2(UNDEFINED), is_external(false){
     strcpy(cmd, cmd_line);
+    cmd_num_args = _parseCommandLine(cmd_line,cmd_args);
     time(&init_time);
 }
 
@@ -260,7 +259,7 @@ void JobsCommand::execute() {
 }
 
 void KillCommand::execute() {
-    if (getNumArguments() != 3){
+    if (getNumArguments() != 3 || *getArguments()[1] != '-' || atoi(getArguments()[2]) == 0 || atoi(getArguments()[1]+1) == 0){
         cout << "smash error: kill: invalid arguments" << endl;
         return;
     }
@@ -433,7 +432,8 @@ void JobsList::printJobsList() {
     smash.getJobsList().removeFinishedJobs();
     for (auto iterator = job_list.begin(); iterator != job_list.end(); ++iterator){
         time_t curr_time;
-        time(&curr_time);
+        //time(&curr_time);
+        curr_time = time(NULL);
         cout << "[" << iterator.operator*().first << "] " <<
         iterator.operator*().second.cmd->getCmd() << " : " << iterator.operator*().second.cmd->getMyPid() << " " <<
         difftime(curr_time,iterator.operator*().second.start_time) << " secs";
@@ -455,20 +455,43 @@ void JobsList::removeJobById(int jobId) {
 
 void JobsList::removeFinishedJobs() {
     for (auto iterator = smash.getJobsList().job_list.begin(); iterator != smash.getJobsList().job_list.end();){
-        int flag = waitpid(iterator->second.cmd->getMyPid(), NULL, WNOHANG);
-        if (flag < 0){
-            perror("smash error: waitpid failed");
-            return;
+        bool p_flag[3] = {iterator->second.cmd->isPipe(), false, false};
+        if(p_flag[PIPE]){
+            PipeCommand* our_command = static_cast<PipeCommand*>(iterator->second.cmd);
+            p_flag[FIRST] = our_command->is_done[0];
+            p_flag[SECOND] = our_command->is_done[1];
         }
-        else if (flag == 0){
-            ++iterator;
-            continue;
+        if(!p_flag[PIPE] || (p_flag[PIPE] && !p_flag[FIRST])) {
+            int flag = waitpid(p_flag[PIPE] ? iterator->second.cmd->getMyPid2() : iterator->second.cmd->getMyPid(), NULL, WNOHANG);
+            if (flag < 0) {
+                perror("smash error: waitpid failed");
+                return;
+            } else if (flag == 0) {
+                ++iterator;
+                continue;
+            }
+            if(p_flag[PIPE]) p_flag[FIRST] = true;
         }
-        else{
-            auto temp = iterator;
-            ++iterator;
-            smash.getJobsList().removeJobById(temp->first);
+        if(p_flag[PIPE]){
+            PipeCommand* our_command = static_cast<PipeCommand*>(iterator->second.cmd);
+            our_command->is_done[0] = p_flag[FIRST];
+            if(!p_flag[SECOND]) {
+                int flag2 = waitpid(iterator->second.cmd->getMyPid(), NULL, WNOHANG);
+                if (flag2 < 0) {
+                    perror("smash error: waitpid failed");
+                    return;
+                } else if (flag2 == 0) {
+                    ++iterator;
+                    continue;
+                }
+                our_command->is_done[1] = true;
+                p_flag[SECOND] = true;
+            }
         }
+        auto temp = iterator;
+        ++iterator;
+        if(p_flag[PIPE] && (!p_flag[FIRST] || !p_flag[SECOND])) continue;
+        smash.getJobsList().removeJobById(temp->first);
     }
 }
 
@@ -496,8 +519,10 @@ PipeCommand::PipeCommand(const char *cmd_line, const int index, Mode mode) : Com
     getCmd()[index-1] = '\0';
     strcpy(cmd1, getCmd());
     getCmd()[index-1] = '|';
+    setIsPipe(true);
+    is_done[0] = false;
+    is_done[1] = false;
 }
-
 
 void PipeCommand::execute() {
     bool bg_flag = _isBackgroundComamnd(cmd2);
@@ -528,6 +553,13 @@ void PipeCommand::execute() {
         }
         close(p[READ]);
         close(p[WRITE]);
+        Command* our_cmd1 = smash.CreateCommand(string(cmd1));
+        if(our_cmd1->is_external){
+            char* const args[] = {(char*)"/bin/bash", (char*)"-c", cmd1, nullptr};
+            execv("/bin/bash", (char* const*)args);
+            perror("smash error: execv failed");
+            exit(0);
+        }
         smash.executeCommand(string(cmd1), NOT_ALARM);
         return;
     }
@@ -545,11 +577,19 @@ void PipeCommand::execute() {
             }
             close(p[READ]);
             close(p[WRITE]);
+            Command* our_cmd2 = smash.CreateCommand(string(cmd2));
+            if(our_cmd2->is_external){
+                char* const args[] = {(char*)"/bin/bash", (char*)"-c", cmd2, nullptr};
+                execv("/bin/bash", (char* const*)args);
+                perror("smash error: execv failed");
+                exit(0);
+            }
             smash.executeCommand(string(cmd2), NOT_ALARM);
             return;
         }
         else{
             this->setPid(pid2);
+            this->setPid2(pid1);
             close(p[READ]);
             close(p[WRITE]);
             if (!bg_flag) {
