@@ -9,11 +9,11 @@ extern SmallShell& smash;
 void ctrlZHandler(int sig_num) {
     cout << "smash: got ctrl-Z" << endl;
     if (smash.getCurrCmd() != nullptr){
-        smash.getJobsList().addJob(smash.getCurrCmd(), true);
         if (kill(smash.getCurrCmd()->getMyPid(), SIGTSTP) < 0){
             perror("smash error: kill failed");
             return;
         }
+        smash.getJobsList().addJob(smash.getCurrCmd(), true);
         cout << "smash: process " << smash.getCurrCmd()->getMyPid() << " was stopped" << endl;
     }
     /*else{
@@ -31,6 +31,7 @@ void ctrlCHandler(int sig_num) {
         }
         cout << "smash: process " << smash.getCurrCmd()->getMyPid() << " was killed" << endl;
         smash.getJobsList().removeFinishedJobs();
+        smash.alarm_jobs.remove(smash.getCurrCmd());
     }
     /*else{
         smash.printPrompt();
@@ -39,17 +40,20 @@ void ctrlCHandler(int sig_num) {
 }
 
 void alarmHandler(int sig_num) {
-    cout << "smash got an alarm" << endl;
+    cout << "smash: got an alarm" << endl;
+    smash.getJobsList().removeFinishedJobs();
     time_t curr_time;
     time(&curr_time);
     //string str(smash.getJobsList().job_list.rbegin()->second.cmd->getCmd());
     //bool bg_flag = str[str.find_last_not_of(" ")] == '&';
     for (auto iterator = smash.alarm_jobs.begin(); iterator != smash.alarm_jobs.end(); ) {
         if (iterator.operator*()->getAlarmTime() <= difftime(curr_time,iterator.operator*()->getInitTime())){
-            cout << "smash: " << iterator.operator*()->getCmd() << " timed out!" << endl;
-            if(kill(iterator.operator*()->getMyPid(), SIGKILL) < 0){
-                perror("smash error: kill failed");
-                return;
+            if(iterator.operator*()->getMyPid()) {
+                cout << "smash: timeout " << iterator.operator*()->getAlarmTime() << " " << iterator.operator*()->getCmd() << " timed out!" << endl;
+                if (kill(iterator.operator*()->getMyPid(), SIGKILL) < 0) {
+                    perror("smash error: kill failed");
+                    return;
+                }
             }
             auto temp = iterator;
             ++iterator;
