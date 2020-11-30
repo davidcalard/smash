@@ -62,7 +62,7 @@ public:
     bool isPipe() { return is_pipe; }
     void setIsPipe(bool status) { is_pipe = status; }
     int& getMyPid2() { return pid2; }
-    void setPid2(int pid2) { pid2 = pid2; }
+    void setPid2(int n) { pid2 = n; }
     bool is_external;
     //virtual void prepare();
     // virtual void cleanup();
@@ -222,7 +222,7 @@ private:
     SmallShell();
 
 public:
-    Command *CreateCommand(const std::string cmd_line);
+    Command *CreateCommand(std::string cmd_line);
     SmallShell(SmallShell const &) = delete; // disable copy ctor
     void operator=(SmallShell const &) = delete; // disable = operator
     static SmallShell &getInstance() // make SmallShell singleton
