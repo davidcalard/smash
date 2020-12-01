@@ -9,16 +9,20 @@ SmallShell& smash = SmallShell::getInstance();
 
 int main(int argc, char* argv[]) {
 
-    if(signal(SIGTSTP , ctrlZHandler)==SIG_ERR) {
+    struct sigaction alarm_act, ctrlz_act, ctrlc_act;
+    alarm_act.sa_flags = SA_RESTART;
+    ctrlc_act.sa_flags = SA_RESTART;
+    ctrlz_act.sa_flags = SA_RESTART;
+    alarm_act.sa_handler = alarmHandler;
+    ctrlc_act.sa_handler = ctrlCHandler;
+    ctrlz_act.sa_handler = ctrlZHandler;
+
+    if(sigaction(SIGTSTP , &ctrlz_act, NULL)< 0) {
         perror("smash error: failed to set ctrl-Z handler");
     }
-    if(signal(SIGINT , ctrlCHandler)==SIG_ERR) {
+    if(sigaction(SIGINT , &ctrlc_act, NULL) < 0) {
         perror("smash error: failed to set ctrl-C handler");
     }
-    struct sigaction alarm_act;
-    //memset(alarm_act, '\0', sizeof(alarm_act));
-    alarm_act.sa_flags = SA_RESTART;
-    alarm_act.sa_handler = alarmHandler;
     if (sigaction(SIGALRM, &alarm_act, NULL) < 0){
         perror("smash error: failed to set alarm handler");
     }
