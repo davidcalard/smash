@@ -32,6 +32,7 @@
 #define PIPE 0
 #define FIRST 1
 #define SECOND 2
+#define COUNT_MAX 1024
 
 typedef bool Mode;
 
@@ -46,7 +47,7 @@ class Command {
     bool is_pipe;
     int pid2;
 public:
-    Command(const char* cmd_line);
+    Command(char* cmd_line);
     virtual ~Command() {}
     virtual void execute() = 0;
     char** getArguments() { return cmd_args; }
@@ -64,19 +65,21 @@ public:
     int& getMyPid2() { return pid2; }
     void setPid2(int n) { pid2 = n; }
     bool is_external;
+    bool is_gone;
+    bool is_bg;
     //virtual void prepare();
     // virtual void cleanup();
 };
 
 class BuiltInCommand : public Command {
 public:
-    BuiltInCommand(const char* cmd_line) : Command(cmd_line) {}
+    BuiltInCommand(char* cmd_line) : Command(cmd_line) {}
     virtual ~BuiltInCommand() {}
 };
 
 class ExternalCommand : public Command {
 public:
-    ExternalCommand(const char* cmd_line) : Command(cmd_line) { is_external = true; }
+    ExternalCommand(char* cmd_line) : Command(cmd_line) { is_external = true; }
     virtual ~ExternalCommand() {}
     void execute() override;
 };
@@ -89,7 +92,7 @@ class PipeCommand : public Command {
     char cmd1[COMMAND_LINE_MAX_LENGTH];
 public:
     bool is_done[2];
-    PipeCommand(const char* cmd_line, const int index, Mode mode);
+    PipeCommand(char* cmd_line, const int index, Mode mode);
     virtual ~PipeCommand() {}
     void execute() override;
 };
@@ -99,7 +102,7 @@ class RedirectionCommand : public Command {
     const int index;
     char* command;
 public:
-    RedirectionCommand(const char* cmd_line, const int index, Mode mode);
+    RedirectionCommand(char* cmd_line, const int index, Mode mode);
     ~RedirectionCommand() override;
     void execute() override;
     Mode getMode() { return mode; }
@@ -109,35 +112,35 @@ public:
 
 class ChangePromptCommand : public BuiltInCommand {
 public:
-    ChangePromptCommand(const char *cmd_line): BuiltInCommand(cmd_line) {}
+    ChangePromptCommand(char *cmd_line): BuiltInCommand(cmd_line) {}
     virtual ~ChangePromptCommand() {}
     void execute() override;
 };
 
 class LetSeeCommand : public BuiltInCommand {
 public:
-    LetSeeCommand(const char* cmd_line): BuiltInCommand(cmd_line) {}
+    LetSeeCommand(char* cmd_line): BuiltInCommand(cmd_line) {}
     virtual ~LetSeeCommand() {}
     void execute() override;
 };
 
 class ChangeDirCommand : public BuiltInCommand {
 public:
-    ChangeDirCommand(const char* cmd_line): BuiltInCommand(cmd_line) {};
+    ChangeDirCommand(char* cmd_line): BuiltInCommand(cmd_line) {};
     virtual ~ChangeDirCommand() {}
     void execute() override;
 };
 
 class GetCurrDirCommand : public BuiltInCommand {
 public:
-    GetCurrDirCommand(const char* cmd_line): BuiltInCommand(cmd_line) {}
+    GetCurrDirCommand(char* cmd_line): BuiltInCommand(cmd_line) {}
     virtual ~GetCurrDirCommand() {}
     void execute() override;
 };
 
 class ShowPidCommand : public BuiltInCommand {
 public:
-    ShowPidCommand(const char* cmd_line): BuiltInCommand(cmd_line) {}
+    ShowPidCommand(char* cmd_line): BuiltInCommand(cmd_line) {}
     virtual ~ShowPidCommand() {}
     void execute() override;
 };
@@ -146,7 +149,7 @@ class JobsList;
 
 class QuitCommand : public BuiltInCommand {
 public:
-    QuitCommand(const char* cmd_line): BuiltInCommand(cmd_line) {}
+    QuitCommand(char* cmd_line): BuiltInCommand(cmd_line) {}
     virtual ~QuitCommand() {}
     void execute() override;
 };
@@ -178,36 +181,43 @@ public:
 class JobsCommand : public BuiltInCommand {
     // TODO: Add your data members
 public:
-    JobsCommand(const char* cmd_line): BuiltInCommand(cmd_line) {}
+    JobsCommand(char* cmd_line): BuiltInCommand(cmd_line) {}
     virtual ~JobsCommand() {}
     void execute() override;
 };
 
 class KillCommand : public BuiltInCommand {
 public:
-    KillCommand(const char* cmd_line): BuiltInCommand(cmd_line) {}
+    KillCommand(char* cmd_line): BuiltInCommand(cmd_line) {}
     virtual ~KillCommand() {}
     void execute() override;
 };
 
 class ForegroundCommand : public BuiltInCommand {
 public:
-    ForegroundCommand(const char* cmd_line): BuiltInCommand(cmd_line) {}
+    ForegroundCommand(char* cmd_line): BuiltInCommand(cmd_line) {}
     virtual ~ForegroundCommand() {}
     void execute() override;
 };
 
 class BackgroundCommand : public BuiltInCommand {
 public:
-    BackgroundCommand(const char* cmd_line): BuiltInCommand(cmd_line) {}
+    BackgroundCommand(char* cmd_line): BuiltInCommand(cmd_line) {}
     virtual ~BackgroundCommand() {}
     void execute() override;
 };
 
 class TimeOutCommand : public Command {
 public:
-    TimeOutCommand(const char* cmd_line): Command(cmd_line) {}
+    TimeOutCommand(char* cmd_line): Command(cmd_line) {}
     virtual ~TimeOutCommand() {}
+    void execute() override;
+};
+
+class CPCommand : public Command {
+public:
+    CPCommand(char* cmd_line): Command(cmd_line) {}
+    virtual ~CPCommand() {}
     void execute() override;
 };
 
