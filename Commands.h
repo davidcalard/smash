@@ -38,8 +38,8 @@ typedef bool Mode;
 
 class Command {
     char* cmd_args[COMMAND_MAX_ARGS];
-    int cmd_num_args;
     char cmd[COMMAND_LINE_MAX_LENGTH];
+    int cmd_num_args;
     int pid;
     time_t alarm_time;
     time_t init_time;
@@ -47,7 +47,7 @@ class Command {
     bool is_pipe;
     int pid2;
 public:
-    Command(char* cmd_line);
+    Command(char* cmd_line, char* full_cmd);
     virtual ~Command() {}
     virtual void execute() = 0;
     char** getArguments() { return cmd_args; }
@@ -67,19 +67,20 @@ public:
     bool is_external;
     bool is_gone;
     bool is_bg;
+    char full_cmd[COMMAND_LINE_MAX_LENGTH];
     //virtual void prepare();
     // virtual void cleanup();
 };
 
 class BuiltInCommand : public Command {
 public:
-    BuiltInCommand(char* cmd_line) : Command(cmd_line) {}
+    BuiltInCommand(char* cmd_line, char* full_cmd) : Command(cmd_line,full_cmd) {}
     virtual ~BuiltInCommand() {}
 };
 
 class ExternalCommand : public Command {
 public:
-    ExternalCommand(char* cmd_line) : Command(cmd_line) { is_external = true; }
+    ExternalCommand(char* cmd_line, char* full_cmd): Command(cmd_line,full_cmd) { is_external = true; }
     virtual ~ExternalCommand() {}
     void execute() override;
 };
@@ -92,7 +93,7 @@ class PipeCommand : public Command {
     char cmd1[COMMAND_LINE_MAX_LENGTH];
 public:
     bool is_done[2];
-    PipeCommand(char* cmd_line, const int index, Mode mode);
+    PipeCommand(char* cmd_line, char* full_cmd, const int index, Mode mode);
     virtual ~PipeCommand() {}
     void execute() override;
 };
@@ -102,7 +103,7 @@ class RedirectionCommand : public Command {
     const int index;
     char* command;
 public:
-    RedirectionCommand(char* cmd_line, const int index, Mode mode);
+    RedirectionCommand(char* cmd_line, char* full_cmd, const int index, Mode mode);
     ~RedirectionCommand() override;
     void execute() override;
     Mode getMode() { return mode; }
@@ -112,35 +113,35 @@ public:
 
 class ChangePromptCommand : public BuiltInCommand {
 public:
-    ChangePromptCommand(char *cmd_line): BuiltInCommand(cmd_line) {}
+    ChangePromptCommand(char* cmd_line, char* full_cmd): BuiltInCommand(cmd_line,full_cmd) {}
     virtual ~ChangePromptCommand() {}
     void execute() override;
 };
 
 class LetSeeCommand : public BuiltInCommand {
 public:
-    LetSeeCommand(char* cmd_line): BuiltInCommand(cmd_line) {}
+    LetSeeCommand(char* cmd_line, char* full_cmd): BuiltInCommand(cmd_line,full_cmd) {}
     virtual ~LetSeeCommand() {}
     void execute() override;
 };
 
 class ChangeDirCommand : public BuiltInCommand {
 public:
-    ChangeDirCommand(char* cmd_line): BuiltInCommand(cmd_line) {};
+    ChangeDirCommand(char* cmd_line, char* full_cmd): BuiltInCommand(cmd_line,full_cmd) {};
     virtual ~ChangeDirCommand() {}
     void execute() override;
 };
 
 class GetCurrDirCommand : public BuiltInCommand {
 public:
-    GetCurrDirCommand(char* cmd_line): BuiltInCommand(cmd_line) {}
+    GetCurrDirCommand(char* cmd_line, char* full_cmd): BuiltInCommand(cmd_line,full_cmd) {}
     virtual ~GetCurrDirCommand() {}
     void execute() override;
 };
 
 class ShowPidCommand : public BuiltInCommand {
 public:
-    ShowPidCommand(char* cmd_line): BuiltInCommand(cmd_line) {}
+    ShowPidCommand(char* cmd_line, char* full_cmd): BuiltInCommand(cmd_line,full_cmd) {}
     virtual ~ShowPidCommand() {}
     void execute() override;
 };
@@ -149,7 +150,7 @@ class JobsList;
 
 class QuitCommand : public BuiltInCommand {
 public:
-    QuitCommand(char* cmd_line): BuiltInCommand(cmd_line) {}
+    QuitCommand(char* cmd_line, char* full_cmd): BuiltInCommand(cmd_line,full_cmd) {}
     virtual ~QuitCommand() {}
     void execute() override;
 };
@@ -179,44 +180,43 @@ public:
 };
 
 class JobsCommand : public BuiltInCommand {
-    // TODO: Add your data members
 public:
-    JobsCommand(char* cmd_line): BuiltInCommand(cmd_line) {}
+    JobsCommand(char* cmd_line, char* full_cmd): BuiltInCommand(cmd_line,full_cmd) {}
     virtual ~JobsCommand() {}
     void execute() override;
 };
 
 class KillCommand : public BuiltInCommand {
 public:
-    KillCommand(char* cmd_line): BuiltInCommand(cmd_line) {}
+    KillCommand(char* cmd_line, char* full_cmd): BuiltInCommand(cmd_line,full_cmd) {}
     virtual ~KillCommand() {}
     void execute() override;
 };
 
 class ForegroundCommand : public BuiltInCommand {
 public:
-    ForegroundCommand(char* cmd_line): BuiltInCommand(cmd_line) {}
+    ForegroundCommand(char* cmd_line, char* full_cmd): BuiltInCommand(cmd_line,full_cmd) {}
     virtual ~ForegroundCommand() {}
     void execute() override;
 };
 
 class BackgroundCommand : public BuiltInCommand {
 public:
-    BackgroundCommand(char* cmd_line): BuiltInCommand(cmd_line) {}
+    BackgroundCommand(char* cmd_line, char* full_cmd): BuiltInCommand(cmd_line,full_cmd) {}
     virtual ~BackgroundCommand() {}
     void execute() override;
 };
 
 class TimeOutCommand : public Command {
 public:
-    TimeOutCommand(char* cmd_line): Command(cmd_line) {}
+    TimeOutCommand(char* cmd_line, char* full_cmd): Command(cmd_line,full_cmd) {}
     virtual ~TimeOutCommand() {}
     void execute() override;
 };
 
 class CPCommand : public Command {
 public:
-    CPCommand(char* cmd_line): Command(cmd_line) {}
+    CPCommand(char* cmd_line, char* full_cmd): Command(cmd_line,full_cmd) {}
     virtual ~CPCommand() {}
     void execute() override;
 };
@@ -232,7 +232,7 @@ private:
     SmallShell();
 
 public:
-    Command *CreateCommand(std::string cmd_line);
+    Command *CreateCommand(std::string cmd_line, std::string full_cmd);
     SmallShell(SmallShell const &) = delete; // disable copy ctor
     void operator=(SmallShell const &) = delete; // disable = operator
     static SmallShell &getInstance() // make SmallShell singleton
@@ -243,7 +243,7 @@ public:
     }
     ~SmallShell();
     std::list<Command*> alarm_jobs;
-    void executeCommand(const std::string cmd_line, time_t alarm_time);
+    void executeCommand(const std::string cmd_line,const std::string full_cmd, time_t alarm_time);
     void printPrompt() { std::cout << prompt; }
     char* lastDir() { return last_dir; }
     bool isLastDirSet() { return last_dir_init; }
