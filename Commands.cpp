@@ -84,110 +84,92 @@ void _removeBackgroundSign(char* cmd_line) {
 
 SmallShell::SmallShell(): prompt("smash> "), last_dir_init(false), curr_cmd(nullptr), smash_pid(getpid()) {}
 
-SmallShell::~SmallShell() {
-// TODO: add your implementation
-}
+SmallShell::~SmallShell() {}
 
 /**
 * Creates and returns a pointer to Command class which matches the given command line (cmd_line)
 */
-Command * SmallShell::CreateCommand(std::string cmd_s) {
-// For example:
-/*
-  string cmd_s = string(cmd_line);
-  if (cmd_s.find("pwd") == 0) {
-    return new GetCurrDirCommand(cmd_line);
-  }
-  else if ...
-  .....
-  else {
-    return new ExternalCommand(cmd_line);
-  }
-*/
+Command * SmallShell::CreateCommand(std::string cmd_s, std::string full_cmd) {
+
     string temp = _trim(cmd_s);
     int pipe_index = cmd_s.find_first_of("|");
     if (pipe_index != string::npos){
         if (string::npos != cmd_s.find("|&")){
-            return new PipeCommand((char*)cmd_s.c_str(), pipe_index+1, ERR_PIPE);
+            return new PipeCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str(), pipe_index+1, ERR_PIPE);
         }
         else{
-            return new PipeCommand((char*)cmd_s.c_str(), pipe_index+1, PIPE);
+            return new PipeCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str(), pipe_index+1, PIPE);
         }
     }
     int redir_index = cmd_s.find_first_of(">");
     if (redir_index != string::npos){
         if (cmd_s[redir_index+1] == '>'){
-            return new RedirectionCommand((char*)cmd_s.c_str(),redir_index+1, APPEND);
+            return new RedirectionCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str(),redir_index+1, APPEND);
         }
         else{
-            return new RedirectionCommand((char*)cmd_s.c_str(), redir_index+1, OVERRIDE);
+            return new RedirectionCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str(), redir_index+1, OVERRIDE);
         }
     }
     else if (temp.find("cp") == 0){
-        return new CPCommand((char*)cmd_s.c_str());
+        return new CPCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str());
     }
     else if (temp.find("timeout") == 0) {
-        return new TimeOutCommand((char*)cmd_s.c_str());
+        return new TimeOutCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str());
     }
     else if (temp.find("chprompt") == 0) {
-        return new ChangePromptCommand((char*)cmd_s.c_str());
+        return new ChangePromptCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str());
     }
     else if (temp.find("ls") == 0) {
-        return new LetSeeCommand((char*)cmd_s.c_str());
+        return new LetSeeCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str());
     }
     else if (temp.find("showpid") == 0) {
-        return new ShowPidCommand((char*)cmd_s.c_str());
+        return new ShowPidCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str());
     }
     else if (temp.find("pwd") == 0) {
-        return new GetCurrDirCommand((char*)cmd_s.c_str());
+        return new GetCurrDirCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str());
     }
     else if (temp.find("cd") == 0) {
-        return new ChangeDirCommand((char*)cmd_s.c_str());
+        return new ChangeDirCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str());
     }
     else if (temp.find("jobs") == 0) {
-        return new JobsCommand((char*)cmd_s.c_str());
+        return new JobsCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str());
     }
     else if (temp.find("kill") == 0) {
-        return new KillCommand((char*)cmd_s.c_str());
+        return new KillCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str());
     }
     else if (temp.find("fg") == 0) {
-        return new ForegroundCommand((char*)cmd_s.c_str());
+        return new ForegroundCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str());
     }
     else if (temp.find("bg") == 0) {
-        return new BackgroundCommand((char*)cmd_s.c_str());
+        return new BackgroundCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str());
     }
     else if (temp.find("quit") == 0) {
-        return new QuitCommand((char*)cmd_s.c_str());
+        return new QuitCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str());
     }
     else {
-      return new ExternalCommand((char*)cmd_s.c_str());
+      return new ExternalCommand((char*)cmd_s.c_str(), (char*)full_cmd.c_str());
     }
     return nullptr;
 }
 
-void SmallShell::executeCommand(const std::string cmd_line, time_t alarm_time) {
-    Command* cmd = CreateCommand(cmd_line);
+void SmallShell::executeCommand(const std::string cmd_line, const std::string full_cmd, time_t alarm_time) {
+    Command* cmd = CreateCommand(cmd_line,full_cmd);
     smash.getJobsList().removeFinishedJobs();
     if (alarm_time != NOT_ALARM){
         cmd->setAlarmTime(alarm_time);
         smash.alarm_jobs.push_front(cmd);
     }
     cmd->execute();
-
-  // for example:
-  // Command* cmd = CreateCommand(cmd_line);
-  // cmd->execute();
-  // Please note that you must fork smash process for some commands (e.g., external commands....)
-
 }
 
 //---------------------------------------------------------------------------------//
 //-------------------------------------Command-------------------------------------//
 //---------------------------------------------------------------------------------//
 
-Command::Command(char* cmd_line): pid(0), alarm_time(NOT_ALARM), cmd_job_id(UNDEFINED),
+Command::Command(char* cmd_line, char* full_cmd): pid(0), alarm_time(NOT_ALARM), cmd_job_id(UNDEFINED),
     is_pipe(false), pid2(UNDEFINED), is_external(false), is_gone(false){
     strcpy(cmd, cmd_line);
+    strcpy(this->full_cmd, full_cmd);
     is_bg = _isBackgroundComamnd(cmd_line);
     _removeBackgroundSign(cmd_line);
     cmd_num_args = _parseCommandLine(cmd_line,cmd_args);
@@ -384,7 +366,7 @@ void QuitCommand::execute() {
         }
         smash.getJobsList().killAllJobs();
     }
-    exit(0); //TODO: check
+    exit(0); 
 }
 
 void ExternalCommand::execute() {
@@ -445,7 +427,7 @@ void JobsList::printJobsList() {
         time(&curr_time);
         cout << "[" << iterator.operator*().first << "] ";
         if(iterator->second.cmd->getAlarmTime() != NOT_ALARM) cout << "timeout " << iterator->second.cmd->getAlarmTime() << " ";
-        cout << iterator.operator*().second.cmd->getCmd() << " : " << iterator.operator*().second.cmd->getMyPid() << " " <<
+        cout << iterator.operator*().second.cmd->full_cmd << " : " << iterator.operator*().second.cmd->getMyPid() << " " <<
         difftime(curr_time,iterator.operator*().second.start_time) << " secs";
         if(iterator.operator*().second.is_stopped) cout << " (stopped)";
         cout << endl;
@@ -534,7 +516,7 @@ int JobsList::getMaxAvailableID() {
 //---------------------------------------------------------------------------------//
 
 
-PipeCommand::PipeCommand(char *cmd_line, const int index, Mode mode) : Command(cmd_line), mode(mode) {
+PipeCommand::PipeCommand(char *cmd_line, char* full_cmd, const int index, Mode mode) : Command(cmd_line,full_cmd), mode(mode) {
     strcpy(cmd2, sizeof(char)*(index+mode)+getCmd());
     getCmd()[index-1] = '\0';
     strcpy(cmd1, getCmd());
@@ -573,14 +555,14 @@ void PipeCommand::execute() {
         }
         close(p[READ]);
         close(p[WRITE]);
-        Command* our_cmd1 = smash.CreateCommand(string(cmd1));
+        Command* our_cmd1 = smash.CreateCommand(string(cmd1),string(cmd1));
         if(our_cmd1->is_external){
             char* const args[] = {(char*)"/bin/bash", (char*)"-c", cmd1, nullptr};
             execv("/bin/bash", (char* const*)args);
             perror("smash error: execv failed");
             exit(0);
         }
-        smash.executeCommand(string(cmd1), NOT_ALARM);
+        smash.executeCommand(string(cmd1), string(cmd1), NOT_ALARM);
         return;
     }
     else {
@@ -597,14 +579,14 @@ void PipeCommand::execute() {
             }
             close(p[READ]);
             close(p[WRITE]);
-            Command* our_cmd2 = smash.CreateCommand(string(cmd2));
+            Command* our_cmd2 = smash.CreateCommand(string(cmd2), string(cmd2));
             if(our_cmd2->is_external){
                 char* const args[] = {(char*)"/bin/bash", (char*)"-c", cmd2, nullptr};
                 execv("/bin/bash", (char* const*)args);
                 perror("smash error: execv failed");
                 exit(0);
             }
-            smash.executeCommand(string(cmd2), NOT_ALARM);
+            smash.executeCommand(string(cmd2), string(cmd2), NOT_ALARM);
             return;
         }
         else{
@@ -647,10 +629,10 @@ void TimeOutCommand::execute() {
     }
     alarm(next_alarm_time); //Always success
     string s_cmd(getCmd());
-    smash.executeCommand(s_cmd.substr(s_cmd.find(getArguments()[2])).c_str(), atoi(getArguments()[1]));
+    smash.executeCommand(s_cmd.substr(s_cmd.find(getArguments()[2])).c_str(), s_cmd.substr(s_cmd.find(getArguments()[2])).c_str(), atoi(getArguments()[1]));
 }
 
-RedirectionCommand::RedirectionCommand(char *cmd_line, const int index, Mode mode) : Command(cmd_line), index(index), mode(mode) {
+RedirectionCommand::RedirectionCommand(char *cmd_line, char* full_cmd, const int index, Mode mode) : Command(cmd_line,full_cmd), index(index), mode(mode) {
     command = (char*)malloc(index*sizeof(char));
     strncpy(command, cmd_line, index-1);
 }
@@ -687,7 +669,7 @@ void RedirectionCommand::execute() {
         return;
     }
     close(output);
-    smash.executeCommand(is_bg? string(getCmd(), index-1)+string("&") : string(getCmd(), index-1), NOT_ALARM);
+    smash.executeCommand(is_bg? string(getCmd(), index-1)+string("&") : string(getCmd(), index-1), string(full_cmd), NOT_ALARM);
     if (dup2(old_out, fileno(stdout)) < 0){
         perror("smash error: dup2 failed");
         return;
@@ -742,12 +724,6 @@ void CPCommand::execute(){
         return;
     }
     else{
-        /*setPid(pid);
-        smash.getJobsList().addJob(this);
-        smash.setCurrCmd(this);
-        waitpid(pid, NULL, WSTOPPED);
-        //is_gone = true;
-        smash.unsetCurrCmd();*/
         setPid(pid);
         if(is_bg){
             smash.getJobsList().addJob(this);
