@@ -231,13 +231,13 @@ void GetCurrDirCommand::execute() {
 
 void ChangeDirCommand::execute() {
     if (getNumArguments() > 2){
-        cerr << "smash error: cd: too many arguments" << endl;
+        cout << "smash error: cd: too many arguments" << endl;
         return;
     }
     char buffer[PATH_MAX];
     if (!strcmp(getArguments()[1],"-")){
         if (!smash.isLastDirSet()){
-            cerr << "smash error: cd: OLDPWD not set" << endl;
+            cout << "smash error: cd: OLDPWD not set" << endl;
             return;
         }
         strcpy(buffer, smash.lastDir());
@@ -267,14 +267,14 @@ void JobsCommand::execute() {
 
 void KillCommand::execute() {
     if (getNumArguments() != 3 || *getArguments()[1] != '-' || atoi(getArguments()[2]) == 0 || atoi(getArguments()[1]+1) == 0){
-        cerr << "smash error: kill: invalid arguments" << endl;
+        cout << "smash error: kill: invalid arguments" << endl;
         return;
     }
     int sig = atoi(getArguments()[1]+1);
     int job_id =  atoi(getArguments()[2]);
     JobsList::JobEntry* job = smash.getJobsList().getJobById(job_id);
     if (!job){
-        cerr << "smash error: kill: job-id " << job_id <<" does not exist" << endl;
+        cout << "smash error: kill: job-id " << job_id <<" does not exist" << endl;
         return;
     }
     int pid_kill = job->cmd->getMyPid();
@@ -282,13 +282,13 @@ void KillCommand::execute() {
         perror("smash error: kill failed");
         return;
     }
-    cerr << "signal number " << sig << " was sent to pid " << pid_kill << endl;
+    cout << "signal number " << sig << " was sent to pid " << pid_kill << endl;
     smash.getJobsList().removeFinishedJobs();
 }
 
 void ForegroundCommand::execute() {
     if (getNumArguments() > 2){
-        cerr << "smash error: fg: invalid arguments" << endl;
+        cout << "smash error: fg: invalid arguments" << endl;
         return;
     }
     bool is_stopped = false;
@@ -297,7 +297,7 @@ void ForegroundCommand::execute() {
     if (getNumArguments() == 1){
         auto iterator = smash.getJobsList().job_list.rbegin();
         if (iterator == smash.getJobsList().job_list.rend()){
-            cerr << "smash error: fg: jobs list is empty" << endl;
+            cout << "smash error: fg: jobs list is empty" << endl;
             return;
         }
         pid = iterator->second.cmd->getMyPid();
@@ -308,7 +308,7 @@ void ForegroundCommand::execute() {
     else {
         auto iterator = smash.getJobsList().job_list.find(atoi(getArguments()[1]));
         if (iterator == smash.getJobsList().job_list.end()){
-            cerr << "smash error: fg: job-id " << getArguments()[1] << " does not exist" << endl;
+            cout << "smash error: fg: job-id " << getArguments()[1] << " does not exist" << endl;
             return;
         }
         pid = iterator->second.cmd->getMyPid();
@@ -337,7 +337,7 @@ void ForegroundCommand::execute() {
 
 void BackgroundCommand::execute() {
     if (getNumArguments() > 2){
-        cerr << "smash error: bg: invalid arguments" << endl;
+        cout << "smash error: bg: invalid arguments" << endl;
         return;
     }
     else if (getNumArguments() == 1){
@@ -353,16 +353,16 @@ void BackgroundCommand::execute() {
                 return;
             }
         }
-        cerr << "smash error: bg: there is no stopped jobs to resume" << endl;
+        cout << "smash error: bg: there is no stopped jobs to resume" << endl;
     }
     else{
         auto iterator = smash.getJobsList().job_list.find(atoi(getArguments()[1]));
         if (iterator == smash.getJobsList().job_list.end()){
-            cerr << "smash error: bg: job-id " << getArguments()[1] << " does not exist" << endl;
+            cout << "smash error: bg: job-id " << getArguments()[1] << " does not exist" << endl;
             return;
         }
         if (!iterator->second.is_stopped){
-            cerr << "smash error: bg: job-id " << getArguments()[1] << " is already running in the background" << endl;
+            cout << "smash error: bg: job-id " << getArguments()[1] << " is already running in the background" << endl;
             return;
         }
         if(iterator->second.cmd->getAlarmTime() != NOT_ALARM) cout << "timeout " << iterator->second.cmd->getAlarmTime() << " ";
@@ -633,7 +633,7 @@ void PipeCommand::execute() {
 
 void TimeOutCommand::execute() {
     if(getNumArguments() < 3 || atoi(getArguments()[1]) <= 0){
-        cerr << "smash error: timeout: invalid arguments" << endl;
+        cout << "smash error: timeout: invalid arguments" << endl;
         return;
     }
     time_t next_alarm_time(atoi(getArguments()[1]));
@@ -660,6 +660,7 @@ RedirectionCommand::~RedirectionCommand() {
 }
 
 void RedirectionCommand::execute() {
+    if(is_bg) _removeBackgroundSign(getCmd());
     string output_s = _trim(getCmd()+sizeof(char)*(index+mode));
     int old_out = dup(fileno(stdout));
     if (old_out < 0){
@@ -686,7 +687,7 @@ void RedirectionCommand::execute() {
         return;
     }
     close(output);
-    smash.executeCommand(string(getCmd(), index-1), NOT_ALARM);
+    smash.executeCommand(is_bg? string(getCmd(), index-1)+string("&") : string(getCmd(), index-1), NOT_ALARM);
     if (dup2(old_out, fileno(stdout)) < 0){
         perror("smash error: dup2 failed");
         return;
@@ -761,6 +762,3 @@ void CPCommand::execute(){
         if(getAlarmTime() != NOT_ALARM) smash.alarm_jobs.remove(this);
     }
 }
-
-
-//end
